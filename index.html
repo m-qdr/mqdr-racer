@@ -1,0 +1,920 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="description" content="MQDR Racer — система судейства гонок дронов: пилоты, заезды, хронометраж кругов, подсчёт очков и турнирная таблица.">
+<title>MQDR Racer — судейство гонок дронов</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Ccircle cx='8' cy='8' r='5' fill='%2300e5a0'/%3E%3Ccircle cx='24' cy='8' r='5' fill='%2300b8ff'/%3E%3Ccircle cx='8' cy='24' r='5' fill='%2300b8ff'/%3E%3Ccircle cx='24' cy='24' r='5' fill='%2300e5a0'/%3E%3Crect x='12' y='12' width='8' height='8' rx='2' fill='%23ffd54a'/%3E%3C/svg%3E">
+<style>
+  :root{
+    --bg:#0b0e14; --panel:#121722; --panel2:#0e1420; --line:#1e2636;
+    --text:#e8edf7; --muted:#8a94ab;
+    --accent:#00e5a0; --accent2:#00b8ff; --danger:#ff5470; --warn:#ffb347; --gold:#ffd54a;
+    --mono:ui-monospace,'Cascadia Mono','JetBrains Mono',Consolas,monospace;
+  }
+  *{box-sizing:border-box}
+  html,body{margin:0;padding:0}
+  body{
+    background:radial-gradient(1200px 500px at 80% -10%,#10233a 0%,var(--bg) 55%) fixed,var(--bg);
+    color:var(--text);
+    font:15px/1.5 system-ui,-apple-system,'Segoe UI',Roboto,sans-serif;
+    min-height:100vh;
+  }
+  /* ---------- top bar ---------- */
+  .topbar{
+    display:flex;align-items:center;gap:14px;
+    padding:14px 22px;border-bottom:1px solid var(--line);
+    background:rgba(14,19,32,.85);backdrop-filter:blur(6px);
+    position:sticky;top:0;z-index:10;
+  }
+  .brand-logo{width:34px;height:34px;flex:none}
+  .brand-name{font-weight:800;letter-spacing:.12em;font-size:18px}
+  .brand-name span{color:var(--accent)}
+  .brand-sub{color:var(--muted);font-size:12.5px}
+  .topbar .spacer{flex:1}
+  /* ---------- tabs ---------- */
+  .tabs{display:flex;gap:4px;padding:0 22px;border-bottom:1px solid var(--line);background:rgba(14,19,32,.6);position:sticky;top:63px;z-index:9;overflow-x:auto}
+  .tab-btn{
+    appearance:none;border:0;background:none;color:var(--muted);
+    font:inherit;font-weight:600;padding:12px 16px;cursor:pointer;
+    border-bottom:2px solid transparent;white-space:nowrap;
+  }
+  .tab-btn:hover{color:var(--text)}
+  .tab-btn.active{color:var(--accent);border-bottom-color:var(--accent)}
+  .tab-btn .cnt{
+    display:inline-block;min-width:20px;padding:0 5px;margin-left:6px;
+    background:var(--line);border-radius:9px;font-size:11.5px;text-align:center;color:var(--text);
+  }
+  /* ---------- layout ---------- */
+  .wrap{max-width:1100px;margin:0 auto;padding:22px 22px 80px}
+  .tab{display:none}
+  .tab.active{display:block}
+  .card{
+    background:var(--panel);border:1px solid var(--line);border-radius:14px;
+    padding:18px 20px;margin-bottom:18px;
+  }
+  .card h2{margin:0 0 14px;font-size:16px;letter-spacing:.02em}
+  .card h2 small{color:var(--muted);font-weight:400;margin-left:8px}
+  .grid2{display:grid;grid-template-columns:1fr 1fr;gap:18px}
+  @media(max-width:760px){.grid2{grid-template-columns:1fr}}
+  /* ---------- forms ---------- */
+  .field{display:flex;flex-direction:column;gap:5px;margin-bottom:12px}
+  .field label{font-size:12.5px;color:var(--muted);font-weight:600;letter-spacing:.03em}
+  input,select{
+    background:var(--panel2);border:1px solid var(--line);border-radius:9px;
+    color:var(--text);font:inherit;padding:9px 12px;outline:none;width:100%;
+  }
+  input:focus,select:focus{border-color:var(--accent2)}
+  .form-row{display:flex;gap:10px;align-items:flex-end;flex-wrap:wrap}
+  .form-row .field{flex:1;min-width:140px;margin-bottom:0}
+  /* ---------- buttons ---------- */
+  .btn{
+    appearance:none;border:1px solid var(--line);background:#1a2233;color:var(--text);
+    font:inherit;font-weight:600;padding:9px 16px;border-radius:9px;cursor:pointer;
+    transition:filter .12s, transform .05s;white-space:nowrap;
+  }
+  .btn:hover{filter:brightness(1.2)}
+  .btn:active{transform:translateY(1px)}
+  .btn.primary{background:var(--accent);border-color:var(--accent);color:#04110b}
+  .btn.accent2{background:var(--accent2);border-color:var(--accent2);color:#02131f}
+  .btn.danger{background:transparent;border-color:var(--danger);color:var(--danger)}
+  .btn.danger:hover{background:rgba(255,84,112,.12)}
+  .btn.ghost{background:transparent}
+  .btn.small{padding:5px 11px;font-size:13px;border-radius:7px}
+  .btn:disabled{opacity:.4;cursor:not-allowed}
+  /* ---------- tables ---------- */
+  .tblwrap{overflow-x:auto}
+  table.tbl{width:100%;border-collapse:collapse;font-size:14px}
+  .tbl th{
+    text-align:left;color:var(--muted);font-size:11.5px;font-weight:700;
+    letter-spacing:.06em;text-transform:uppercase;padding:8px 10px;
+    border-bottom:1px solid var(--line);white-space:nowrap;
+  }
+  .tbl td{padding:9px 10px;border-bottom:1px solid rgba(30,38,54,.55);vertical-align:middle;white-space:nowrap}
+  .tbl tr:last-child td{border-bottom:0}
+  .tbl th.num,.tbl td.num{text-align:right}
+  .tbl tr:hover td{background:rgba(0,229,160,.04)}
+  .tbl .mono{font-family:var(--mono);font-size:13.5px}
+  .sub{color:var(--muted);font-size:12px;margin-top:2px}
+  /* ---------- bits ---------- */
+  .chip{display:inline-block;width:12px;height:12px;border-radius:4px;margin-right:8px;vertical-align:-1px;flex:none}
+  .pilot-cell{display:flex;align-items:center;gap:2px}
+  .pos-badge{
+    display:inline-flex;align-items:center;justify-content:center;
+    width:28px;height:28px;border-radius:8px;background:var(--panel2);
+    border:1px solid var(--line);font-family:var(--mono);font-weight:700;
+  }
+  .pos-badge.m1{background:var(--gold);border-color:var(--gold);color:#241c00}
+  .pos-badge.m2{background:#cfd6e4;border-color:#cfd6e4;color:#111722}
+  .pos-badge.m3{background:#cd8b4e;border-color:#cd8b4e;color:#241202}
+  .badge{
+    display:inline-block;padding:3px 10px;border-radius:20px;
+    font-size:11.5px;font-weight:700;letter-spacing:.05em;text-transform:uppercase;
+  }
+  .st-ready{background:rgba(0,184,255,.15);color:var(--accent2)}
+  .st-running{background:rgba(0,229,160,.15);color:var(--accent);animation:pulse 1.6s infinite}
+  .st-finished{background:rgba(138,148,171,.15);color:var(--muted)}
+  @keyframes pulse{50%{opacity:.55}}
+  .fast{color:var(--accent);font-weight:700}
+  .fast-cell{background:rgba(0,229,160,.09)!important}
+  .kbd{
+    font-family:var(--mono);font-size:12px;background:var(--panel2);
+    border:1px solid var(--line);border-bottom-width:2px;border-radius:5px;padding:1px 6px;
+  }
+  .clock{
+    font-family:var(--mono);font-size:52px;font-weight:700;color:var(--accent);
+    letter-spacing:.02em;text-align:center;margin:6px 0 14px;line-height:1.1;
+  }
+  @media(max-width:600px){.clock{font-size:36px}}
+  .empty{color:var(--muted);text-align:center;padding:26px 10px;border:1px dashed var(--line);border-radius:12px}
+  .race-item{
+    display:flex;align-items:center;gap:14px;padding:13px 16px;
+    border:1px solid var(--line);border-radius:12px;margin-bottom:10px;background:var(--panel2);
+    flex-wrap:wrap;
+  }
+  .race-item .name{font-weight:700;font-size:15px}
+  .race-item .meta{color:var(--muted);font-size:13px}
+  .race-item .spacer{flex:1}
+  .hint{color:var(--muted);font-size:13px;margin:8px 0 12px}
+  .checklist{display:flex;flex-direction:column;gap:6px;max-height:340px;overflow:auto}
+  .checklist label{
+    display:flex;align-items:center;gap:10px;padding:8px 12px;
+    border:1px solid var(--line);border-radius:9px;cursor:pointer;background:var(--panel2);
+  }
+  .checklist label:hover{border-color:var(--accent2)}
+  .checklist input[type=checkbox]{width:17px;height:17px;accent-color:var(--accent);flex:none}
+  .bigstat{font-family:var(--mono);font-size:15px}
+  /* ---------- toast ---------- */
+  #toast{
+    position:fixed;left:50%;bottom:26px;transform:translateX(-50%) translateY(20px);
+    background:#182136;border:1px solid var(--accent2);color:var(--text);
+    padding:10px 20px;border-radius:10px;font-size:14px;font-weight:600;
+    opacity:0;pointer-events:none;transition:opacity .25s, transform .25s;z-index:50;
+    max-width:90vw;
+  }
+  #toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
+  #toast.warn{border-color:var(--warn)}
+</style>
+</head>
+<body>
+
+<header class="topbar">
+  <svg class="brand-logo" viewBox="0 0 32 32" aria-hidden="true">
+    <circle cx="8" cy="8" r="5" fill="#00e5a0"/><circle cx="24" cy="8" r="5" fill="#00b8ff"/>
+    <circle cx="8" cy="24" r="5" fill="#00b8ff"/><circle cx="24" cy="24" r="5" fill="#00e5a0"/>
+    <rect x="12" y="12" width="8" height="8" rx="2" fill="#ffd54a"/>
+  </svg>
+  <div>
+    <div class="brand-name">MQDR <span>RACER</span></div>
+    <div class="brand-sub">система судейства гонок дронов</div>
+  </div>
+</header>
+
+<nav class="tabs" id="tabsNav">
+  <button class="tab-btn active" data-tab="pilots">Пилоты <span class="cnt" id="cntPilots">0</span></button>
+  <button class="tab-btn" data-tab="races">Заезды <span class="cnt" id="cntRaces">0</span></button>
+  <button class="tab-btn" data-tab="standings">Турнирная таблица</button>
+  <button class="tab-btn" data-tab="settings">Настройки</button>
+</nav>
+
+<main class="wrap">
+
+  <!-- ================= ПИЛОТЫ ================= -->
+  <section class="tab active" id="tab-pilots">
+    <div class="card">
+      <h2>Добавить пилота</h2>
+      <form id="pilotForm" class="form-row">
+        <div class="field">
+          <label for="pilotName">Имя *</label>
+          <input id="pilotName" required maxlength="40" placeholder="Иван Петров">
+        </div>
+        <div class="field">
+          <label for="pilotCall">Позывной</label>
+          <input id="pilotCall" maxlength="20" placeholder="FALCON">
+        </div>
+        <div class="field">
+          <label for="pilotCh">Канал (5.8 ГГц)</label>
+          <input id="pilotCh" maxlength="10" placeholder="R1 · 5658" style="width:130px">
+        </div>
+        <button class="btn primary" type="submit">Добавить</button>
+      </form>
+    </div>
+    <div class="card">
+      <h2>Список пилотов <small id="pilotsCount"></small></h2>
+      <div id="pilotsList"></div>
+    </div>
+  </section>
+
+  <!-- ================= ЗАЕЗДЫ ================= -->
+  <section class="tab" id="tab-races">
+    <div class="card" id="raceCreateCard">
+      <h2>Новый заезд</h2>
+      <form id="raceForm" class="form-row">
+        <div class="field" style="flex:2">
+          <label for="raceName">Название заезда</label>
+          <input id="raceName" maxlength="60" placeholder="Заезд 1 — квалификация">
+        </div>
+        <button class="btn primary" type="submit">Создать</button>
+      </form>
+    </div>
+    <div id="racesArea"></div>
+  </section>
+
+  <!-- ================= ТАБЛИЦА ================= -->
+  <section class="tab" id="tab-standings">
+    <div class="card">
+      <h2>Турнирная таблица <small>по завершённым заездам</small></h2>
+      <div id="standArea"></div>
+    </div>
+  </section>
+
+  <!-- ================= НАСТРОЙКИ ================= -->
+  <section class="tab" id="tab-settings">
+    <div class="card">
+      <h2>Подсчёт очков</h2>
+      <div class="hint">Очки за заезд = очки за место + бонус за быстрейший круг заезда + очки за каждый пройденный круг. Значения применяются ко всем заездам, включая уже завершённые.</div>
+      <div class="field">
+        <label for="setPoints">Очки за места (через запятую, 1-е значение — за 1 место)</label>
+        <input id="setPoints" placeholder="100, 80, 65, 55, 50...">
+      </div>
+      <div class="form-row">
+        <div class="field">
+          <label for="setFlb">Бонус за быстрейший круг заезда</label>
+          <input id="setFlb" type="number" min="0" step="1" style="width:160px">
+        </div>
+        <div class="field">
+          <label for="setLpp">Очки за каждый пройденный круг</label>
+          <input id="setLpp" type="number" min="0" step="1" style="width:160px">
+        </div>
+        <button class="btn primary" data-action="save-settings" type="button">Сохранить настройки</button>
+      </div>
+    </div>
+
+    <div class="card">
+      <h2>Данные</h2>
+      <div class="form-row">
+        <button class="btn" data-action="export-json" type="button">Экспорт JSON</button>
+        <button class="btn" data-action="import-json" type="button">Импорт JSON</button>
+        <button class="btn accent2" data-action="demo-data" type="button">Демо-данные</button>
+        <button class="btn danger" data-action="reset-all" type="button">Сбросить всё</button>
+        <input type="file" id="importFile" accept="application/json,.json" hidden>
+      </div>
+    </div>
+
+    <div class="card">
+      <h2>Как это работает</h2>
+      <div class="hint" style="margin-top:0">
+        1. Добавьте пилотов на вкладке «Пилоты».<br>
+        2. Создайте заезд, отметьте участников и нажмите «Старт заезда».<br>
+        3. Во время заезда нажимайте <span class="kbd">КРУГ</span> в строке пилота при пересечении линии ворот — клавиши
+        <span class="kbd">1</span>–<span class="kbd">9</span> записывают круг соответствующей строки.
+        Кнопка <span class="kbd">ФИНИШ</span> фиксирует порядок финиша.<br>
+        4. «Завершить заезд» — не финишировавшие получают места после финишировавших (по числу кругов).<br>
+        5. Результаты и очки автоматически попадают в турнирную таблицу. Всё хранится в браузере (localStorage);
+        используйте экспорт/импорт JSON для переноса и резервных копий.
+      </div>
+    </div>
+  </section>
+
+</main>
+
+<div id="toast" role="status"></div>
+<noscript><div style="padding:20px;color:#ff5470">Для работы системы необходим включённый JavaScript.</div></noscript>
+
+<script>
+"use strict";
+
+/* ============================ состояние ============================ */
+
+const LS_KEY = "mqdr-racer-v1";
+const PALETTE = ["#00e5a0","#00b8ff","#ff5470","#ffd54a","#b06cff","#ff8a3d","#4dff88","#ff5cd0","#7ad9ff","#ffb347"];
+const DEFAULT_PLACE_POINTS = [100,80,65,55,50,47,44,41,38,36,34,32,30,28,26,24];
+
+const DEFAULTS = () => ({
+  pilots: [],            // {id,name,callsign,channel,color}
+  races: [],             // {id,name,createdAt,status,startedAt,finishCounter,entries:[{pilotId,laps:[],finishedAt,finishOrder}]}
+  settings: { placePoints: DEFAULT_PLACE_POINTS.slice(), fastestLapBonus: 10, lapPoints: 0 },
+  ui: { tab: "pilots", viewRaceId: null }
+});
+
+let state = load();
+
+function load(){
+  try{
+    const raw = localStorage.getItem(LS_KEY);
+    if(!raw) return DEFAULTS();
+    return migrate(JSON.parse(raw));
+  }catch(e){ console.error(e); return DEFAULTS(); }
+}
+function migrate(o){
+  const d = DEFAULTS();
+  const s = Object.assign(d, o);
+  s.settings = Object.assign({placePoints:DEFAULT_PLACE_POINTS.slice(),fastestLapBonus:10,lapPoints:0}, o.settings || {});
+  if(!Array.isArray(s.settings.placePoints)) s.settings.placePoints = DEFAULT_PLACE_POINTS.slice();
+  s.settings.placePoints = s.settings.placePoints.map(Number).filter(n => isFinite(n) && n >= 0);
+  if(!s.settings.placePoints.length) s.settings.placePoints = DEFAULT_PLACE_POINTS.slice();
+  s.settings.fastestLapBonus = Math.max(0, +s.settings.fastestLapBonus || 0);
+  s.settings.lapPoints = Math.max(0, +s.settings.lapPoints || 0);
+  s.pilots = Array.isArray(s.pilots) ? s.pilots.filter(p => p && p.id) : [];
+  s.races = Array.isArray(s.races) ? s.races.filter(r => r && r.id).map(normalizeRace) : [];
+  s.ui = Object.assign(d.ui, o.ui || {});
+  return s;
+}
+function normalizeRace(r){
+  return {
+    id: r.id, name: r.name || "Заезд", createdAt: r.createdAt || Date.now(),
+    status: ["ready","running","finished"].includes(r.status) ? r.status : "finished",
+    startedAt: r.startedAt || null, finishCounter: r.finishCounter || 0,
+    entries: Array.isArray(r.entries) ? r.entries.map(e => ({
+      pilotId: e.pilotId,
+      laps: Array.isArray(e.laps) ? e.laps.map(Number).filter(n => isFinite(n) && n > 0) : [],
+      finishedAt: e.finishedAt || null, finishOrder: e.finishOrder || null
+    })) : []
+  };
+}
+function save(){ try{ localStorage.setItem(LS_KEY, JSON.stringify(state)); }catch(e){ console.error(e); } }
+
+/* ============================ утилиты ============================ */
+
+const $  = (sel, root) => (root || document).querySelector(sel);
+const $$ = (sel, root) => Array.from((root || document).querySelectorAll(sel));
+
+function uid(){ return (crypto.randomUUID ? crypto.randomUUID() : Date.now().toString(36) + Math.random().toString(36).slice(2,9)); }
+function esc(s){ return String(s == null ? "" : s).replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c])); }
+function getPilot(id){ return state.pilots.find(p => p.id === id) || null; }
+function displayName(p){ return p ? (p.callsign || p.name) : "—"; }
+function getRace(id){ return state.races.find(r => r.id === id) || null; }
+function activeRunningRace(){ return state.races.find(r => r.status === "running") || null; }
+
+function fmtTime(ms){
+  if(ms == null || !isFinite(ms)) return "—";
+  if(ms >= 60000){
+    const m = Math.floor(ms / 60000), s = (ms % 60000) / 1000;
+    return m + ":" + s.toFixed(3).padStart(6, "0");
+  }
+  return (ms / 1000).toFixed(3);
+}
+function fmtClock(ms){
+  const m = Math.floor(ms / 60000), s = Math.floor((ms % 60000) / 1000), cs = Math.floor((ms % 1000) / 10);
+  return m + ":" + String(s).padStart(2,"0") + "." + String(cs).padStart(2,"0");
+}
+function fmtDate(ts){ return ts ? new Date(ts).toLocaleString("ru-RU",{day:"2-digit",month:"2-digit",hour:"2-digit",minute:"2-digit"}) : "—"; }
+
+let toastTimer = null;
+function toast(msg, warn){
+  const t = $("#toast");
+  t.textContent = msg;
+  t.classList.toggle("warn", !!warn);
+  t.classList.add("show");
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => t.classList.remove("show"), 2600);
+}
+
+/* ============================ подсчёт очков ============================ */
+
+function placePointsFor(pos){
+  const t = state.settings.placePoints;
+  if(!t.length) return 0;
+  if(pos <= t.length) return t[pos - 1];
+  return Math.max(0, t[t.length - 1] - 2 * (pos - t.length));
+}
+
+function raceResults(race){
+  const entries = race.entries.map(e => {
+    const laps = e.laps.slice();
+    const bestLap = laps.length ? Math.min.apply(null, laps) : null;
+    const total = laps.reduce((a,b) => a + b, 0);
+    return Object.assign({}, e, {
+      laps, bestLap, total,
+      finished: !!e.finishedAt,
+      status: e.finishedAt ? "FIN" : (laps.length ? "DNF" : "DNS"),
+      pilot: getPilot(e.pilotId)
+    });
+  });
+  const finishers = entries.filter(e => e.finished).sort((a,b) => a.finishOrder - b.finishOrder);
+  const rest = entries.filter(e => !e.finished)
+    .sort((a,b) => b.laps.length - a.laps.length || b.total - a.total);
+  const ranked = finishers.concat(rest);
+
+  let fastest = null;
+  for(const e of entries) for(const l of e.laps) if(fastest === null || l < fastest) fastest = l;
+
+  const results = ranked.map((e, i) => {
+    const pos = i + 1;
+    const scored = e.finished || e.laps.length > 0;
+    const pPlace = scored ? placePointsFor(pos) : 0;
+    const isFastest = fastest !== null && e.laps.length > 0 && e.bestLap === fastest;
+    const pFast = isFastest ? state.settings.fastestLapBonus : 0;
+    const pLaps = state.settings.lapPoints * e.laps.length;
+    return Object.assign(e, { pos, isFastest, pts: pPlace + pFast + pLaps, pPlace, pFast, pLaps });
+  });
+  return { results, fastest };
+}
+
+function standings(){
+  const map = new Map();
+  const rowFor = (pilotId) => {
+    if(!map.has(pilotId)){
+      const p = getPilot(pilotId);
+      if(!p) return null;
+      map.set(pilotId, { pilot: p, total: 0, wins: 0, races: 0, bestPos: null, bestLap: null, perRace: {} });
+    }
+    return map.get(pilotId);
+  };
+  const finishedRaces = state.races.filter(r => r.status === "finished");
+  for(const r of finishedRaces){
+    for(const res of raceResults(r).results){
+      const row = rowFor(res.pilotId);
+      if(!row) continue;
+      row.total += res.pts;
+      row.races++;
+      if(res.pos === 1) row.wins++;
+      if(row.bestPos === null || res.pos < row.bestPos) row.bestPos = res.pos;
+      if(res.bestLap && (row.bestLap === null || res.bestLap < row.bestLap)) row.bestLap = res.bestLap;
+      row.perRace[r.id] = res.pts;
+    }
+  }
+  const rows = Array.from(map.values()).sort((a,b) =>
+    b.total - a.total || b.wins - a.wins ||
+    (a.bestPos == null ? 999 : a.bestPos) - (b.bestPos == null ? 999 : b.bestPos) ||
+    a.pilot.name.localeCompare(b.pilot.name, "ru"));
+  return { rows, finishedRaces };
+}
+
+/* ============================ действия заезда ============================ */
+
+function createRace(name){
+  const r = {
+    id: uid(), name: name || ("Заезд " + (state.races.length + 1)),
+    createdAt: Date.now(), status: "ready", startedAt: null, finishCounter: 0, entries: []
+  };
+  state.races.unshift(r);
+  state.ui.viewRaceId = r.id;
+  save(); renderAll();
+}
+function toggleRacePilot(raceId, pilotId, on){
+  const r = getRace(raceId); if(!r || r.status !== "ready") return;
+  const i = r.entries.findIndex(e => e.pilotId === pilotId);
+  if(on && i < 0) r.entries.push({ pilotId, laps: [], finishedAt: null, finishOrder: null });
+  if(!on && i >= 0) r.entries.splice(i, 1);
+  save(); renderRaces();
+}
+function startRace(raceId){
+  const r = getRace(raceId); if(!r || r.status !== "ready") return;
+  if(activeRunningRace()){ toast("Сначала завершите текущий заезд", true); return; }
+  if(!r.entries.length){ toast("Добавьте хотя бы одного пилота", true); return; }
+  r.status = "running";
+  r.startedAt = Date.now();
+  r.finishCounter = 0;
+  r.entries.forEach(e => { e.laps = []; e.finishedAt = null; e.finishOrder = null; });
+  save(); renderRaces();
+  toast("Заезд начат! Удачи, пилоты 🚁");
+}
+function cumBefore(entry){
+  let s = 0;
+  for(const l of entry.laps) s += l;
+  return s;
+}
+function recordLap(raceId, pilotId){
+  const r = getRace(raceId); if(!r || r.status !== "running") return;
+  const e = r.entries.find(x => x.pilotId === pilotId); if(!e || e.finishedAt) return;
+  const now = Date.now();
+  const lap = now - (r.startedAt + cumBefore(e));
+  if(lap < 700){ toast("Слишком быстро — круг не записан (двойное нажатие?)", true); return; }
+  e.laps.push(lap);
+  save(); renderRaces();
+}
+function undoLap(raceId, pilotId){
+  const r = getRace(raceId); if(!r || r.status !== "running") return;
+  const e = r.entries.find(x => x.pilotId === pilotId); if(!e) return;
+  if(e.finishedAt){ toast("Пилот уже финишировал", true); return; }
+  if(!e.laps.length){ toast("Нечего отменять", true); return; }
+  e.laps.pop();
+  save(); renderRaces();
+}
+function finishPilot(raceId, pilotId){
+  const r = getRace(raceId); if(!r || r.status !== "running") return;
+  const e = r.entries.find(x => x.pilotId === pilotId); if(!e || e.finishedAt) return;
+  r.finishCounter++;
+  e.finishedAt = Date.now();
+  e.finishOrder = r.finishCounter;
+  save(); renderRaces();
+  const p = getPilot(pilotId);
+  toast(displayName(p) + " финишировал — место " + r.finishCounter);
+}
+function endRace(raceId){
+  const r = getRace(raceId); if(!r || r.status !== "running") return;
+  const unfinished = r.entries.filter(e => !e.finishedAt).length;
+  if(!confirm("Завершить заезд?" + (unfinished ? "\nНе финишировавших: " + unfinished + " (места будут присвоены после финишировавших, по числу кругов)." : ""))) return;
+  r.status = "finished";
+  save(); renderAll();
+  toast("Заезд завершён — очки начислены");
+}
+function deleteRace(raceId){
+  const r = getRace(raceId); if(!r) return;
+  if(!confirm("Удалить заезд «" + r.name + "» вместе с результатами?")) return;
+  state.races = state.races.filter(x => x.id !== raceId);
+  if(state.ui.viewRaceId === raceId) state.ui.viewRaceId = null;
+  save(); renderAll();
+}
+function deletePilot(pilotId){
+  const p = getPilot(pilotId); if(!p) return;
+  if(!confirm("Удалить пилота «" + displayName(p) + "» и все его результаты в заездах?")) return;
+  state.pilots = state.pilots.filter(x => x.id !== pilotId);
+  for(const r of state.races) r.entries = r.entries.filter(e => e.pilotId !== pilotId);
+  save(); renderAll();
+}
+
+/* ============================ рендер: пилоты ============================ */
+
+function pilotStats(){
+  const st = standings();
+  const m = new Map();
+  for(const row of st.rows) m.set(row.pilot.id, row);
+  return m;
+}
+
+function renderPilots(){
+  const box = $("#pilotsList");
+  $("#pilotsCount").textContent = state.pilots.length ? state.pilots.length + " чел." : "";
+  if(!state.pilots.length){
+    box.innerHTML = '<div class="empty">Пилотов пока нет — добавьте первого выше 👆</div>';
+    return;
+  }
+  const stats = pilotStats();
+  let html = '<div class="tblwrap"><table class="tbl"><thead><tr>' +
+    "<th></th><th>Пилот</th><th>Канал</th><th class=\"num\">Заездов</th>" +
+    '<th class="num">Очки</th><th class="num">Лучший круг</th><th></th></tr></thead><tbody>';
+  for(const p of state.pilots){
+    const row = stats.get(p.id);
+    html += "<tr>" +
+      '<td><span class="chip" style="background:' + esc(p.color) + '"></span></td>' +
+      "<td><b>" + esc(p.callsign || p.name) + "</b>" +
+        (p.callsign ? ' <span class="sub" style="display:inline">' + esc(p.name) + "</span>" : "") + "</td>" +
+      "<td>" + (p.channel ? '<span class="mono">' + esc(p.channel) + "</span>" : '<span class="sub">—</span>') + "</td>" +
+      '<td class="num">' + (row ? row.races : 0) + "</td>" +
+      '<td class="num"><b>' + (row ? row.total : 0) + "</b></td>" +
+      '<td class="num mono">' + (row && row.bestLap != null ? fmtTime(row.bestLap) : "—") + "</td>" +
+      '<td class="num"><button class="btn danger small" data-action="del-pilot" data-id="' + p.id + '">Удалить</button></td>' +
+      "</tr>";
+  }
+  html += "</tbody></table></div>";
+  box.innerHTML = html;
+}
+
+/* ============================ рендер: заезды ============================ */
+
+function renderRaces(){
+  const area = $("#racesArea");
+  const viewId = state.ui.viewRaceId;
+  const race = viewId ? getRace(viewId) : null;
+
+  if(!race){
+    $("#raceCreateCard").style.display = "";
+    if(!state.races.length){
+      area.innerHTML = '<div class="empty">Заездов пока нет. Создайте первый заезд выше — отметьте пилотов и жмите «Старт».</div>';
+      return;
+    }
+    let html = '<div class="card"><h2>Заезды <small>' + state.races.length + "</small></h2>";
+    for(const r of state.races){
+      const stCls = r.status === "ready" ? "st-ready" : (r.status === "running" ? "st-running" : "st-finished");
+      const stTxt = r.status === "ready" ? "готов" : (r.status === "running" ? "идёт" : "завершён");
+      html += '<div class="race-item">' +
+        '<span class="badge ' + stCls + '">' + stTxt + "</span>" +
+        '<div><div class="name">' + esc(r.name) + "</div>" +
+        '<div class="meta">' + fmtDate(r.createdAt) + " · " + r.entries.length + " пилотов</div></div>" +
+        '<div class="spacer"></div>' +
+        '<button class="btn small" data-action="open-race" data-id="' + r.id + '">' +
+          (r.status === "running" ? "Продолжить" : "Открыть") + "</button>" +
+        '<button class="btn danger small" data-action="del-race" data-id="' + r.id + '">Удалить</button>' +
+        "</div>";
+    }
+    area.innerHTML = html + "</div>";
+    return;
+  }
+
+  /* --- карточка одного заезда --- */
+  $("#raceCreateCard").style.display = "none";
+  let html = '<div class="card">' +
+    '<div class="form-row" style="align-items:center;margin-bottom:6px">' +
+      '<div><b style="font-size:18px">' + esc(race.name) + "</b> &nbsp; " +
+        '<span class="badge ' + (race.status === "ready" ? "st-ready" : race.status === "running" ? "st-running" : "st-finished") + '">' +
+        (race.status === "ready" ? "готов" : race.status === "running" ? "идёт" : "завершён") + "</span></div>" +
+      '<div class="spacer" style="flex:1"></div>' +
+      '<button class="btn small ghost" data-action="back-to-races">← Все заезды</button>' +
+      '<button class="btn danger small" data-action="del-race" data-id="' + race.id + '">Удалить</button>' +
+    "</div>";
+
+  if(race.status === "ready"){
+    html += '<div class="hint">Отметьте участников заезда, затем нажмите «Старт заезда». Хронометраж начнётся с момента старта.</div>';
+    if(!state.pilots.length){
+      html += '<div class="empty">Сначала добавьте пилотов на вкладке «Пилоты».</div>';
+    }else{
+      html += '<div class="checklist" style="margin-bottom:14px">';
+      for(const p of state.pilots){
+        const on = race.entries.some(e => e.pilotId === p.id);
+        html += '<label><input type="checkbox" data-action="toggle-pilot" data-race="' + race.id + '" data-id="' + p.id + '"' + (on ? " checked" : "") + ">" +
+          '<span class="chip" style="background:' + esc(p.color) + '"></span><b>' + esc(p.callsign || p.name) + "</b>" +
+          '<span class="sub">' + esc(p.name) + (p.channel ? " · " + esc(p.channel) : "") + "</span></label>";
+      }
+      html += "</div>";
+      html += '<button class="btn primary" data-action="start-race" data-id="' + race.id + '">▶ Старт заезда (' + race.entries.length + ")</button>";
+      if(race.entries.length < 2) html += '<div class="hint" style="margin-top:8px">⚠ Рекомендуется минимум 2 пилота для начисления мест.</div>';
+    }
+  }
+
+  if(race.status === "running"){
+    html += '<div class="clock" id="raceClock">0:00.00</div>' +
+      '<div class="hint" style="text-align:center">Клавиши <span class="kbd">1</span>–<span class="kbd">9</span> — круг пилота из строки N · <span class="kbd">−</span> отменяет последний круг</div>';
+    html += '<div class="tblwrap"><table class="tbl"><thead><tr>' +
+      "<th>#</th><th>Пилот</th><th>Текущий круг</th><th class=\"num\">Кругов</th>" +
+      '<th class="num">Последний</th><th class="num">Лучший</th><th class="num">Действия</th></tr></thead><tbody>';
+    race.entries.forEach((e, idx) => {
+      const p = getPilot(e.pilotId);
+      const best = e.laps.length ? Math.min.apply(null, e.laps) : null;
+      const finished = !!e.finishedAt;
+      html += "<tr>" +
+        '<td>' + (finished ? '<span class="pos-badge m' + e.finishOrder + '">' + e.finishOrder + "</span>" : '<span class="sub">—</span>') + "</td>" +
+        "<td><span class=\"pilot-cell\"><span class=\"chip\" style=\"background:" + esc(p ? p.color : "#555") + '"></span><b>' +
+          esc(p ? displayName(p) : "??") + "</b>" +
+          (p && p.channel ? ' <span class="sub" style="display:inline">' + esc(p.channel) + "</span>" : "") + "</span></td>" +
+        '<td class="mono" data-cur="' + e.pilotId + '">' + (finished ? "финиш" : "0.000") + "</td>" +
+        '<td class="num mono"><b>' + e.laps.length + "</b></td>" +
+        '<td class="num mono">' + (e.laps.length ? fmtTime(e.laps[e.laps.length - 1]) : "—") + "</td>" +
+        '<td class="num mono">' + (best != null ? fmtTime(best) : "—") + "</td>" +
+        '<td class="num">' +
+          (finished
+            ? '<span class="sub">время ' + fmtTime(e.laps.reduce((a,b) => a+b, 0)) + "</span>"
+            : '<button class="btn primary small" data-action="lap" data-race="' + race.id + '" data-id="' + e.pilotId + '">КРУГ</button> ' +
+              '<button class="btn accent2 small" data-action="finish-pilot" data-race="' + race.id + '" data-id="' + e.pilotId + '">ФИНИШ</button> ' +
+              '<button class="btn ghost small" data-action="undo-lap" data-race="' + race.id + '" data-id="' + e.pilotId + '" title="Отменить последний круг">−</button>') +
+        "</td></tr>";
+    });
+    html += "</tbody></table></div>";
+    html += '<div class="form-row" style="margin-top:14px">' +
+      '<button class="btn danger" data-action="end-race" data-id="' + race.id + '">■ Завершить заезд</button>' +
+      "</div>";
+  }
+
+  if(race.status === "finished"){
+    const { results, fastest } = raceResults(race);
+    const fastPilot = fastest !== null ? results.find(r => r.isFastest) : null;
+    html += (fastPilot ? '<div class="hint" style="margin-bottom:10px">⚡ Быстрейший круг заезда: <b class="fast mono">' + fmtTime(fastest) +
+      "</b> — <b>" + esc(displayName(fastPilot.pilot)) + "</b> (бонус +" + state.settings.fastestLapBonus + ")</div>" : "");
+    html += '<div class="tblwrap"><table class="tbl"><thead><tr>' +
+      "<th>Место</th><th>Пилот</th><th>Статус</th><th class=\"num\">Кругов</th>" +
+      '<th class="num">Лучший круг</th><th class="num">Время</th><th class="num">Очки</th></tr></thead><tbody>';
+    for(const r of results){
+      const medal = r.pos <= 3 ? " m" + r.pos : "";
+      const bd = [];
+      if(r.pPlace) bd.push(r.pPlace + " за место");
+      if(r.pFast) bd.push(r.pFast + " за лучший круг");
+      if(r.pLaps) bd.push(r.pLaps + " за круги");
+      html += "<tr>" +
+        '<td><span class="pos-badge' + medal + '">' + r.pos + "</span></td>" +
+        "<td><span class=\"pilot-cell\"><span class=\"chip\" style=\"background:" + esc(r.pilot ? r.pilot.color : "#555") + '"></span><b>' +
+          esc(r.pilot ? displayName(r.pilot) : "??") + "</b></span></td>" +
+        '<td><span class="sub">' + r.status + "</span></td>" +
+        '<td class="num mono">' + r.laps.length + "</td>" +
+        '<td class="num mono' + (r.isFastest ? " fast fast-cell" : "") + '">' + fmtTime(r.bestLap) + "</td>" +
+        '<td class="num mono">' + (r.finished || r.laps.length ? fmtTime(r.total) : "—") + "</td>" +
+        '<td class="num"><b class="bigstat">' + r.pts + "</b>" +
+          (bd.length ? '<div class="sub">' + bd.join(" + ") + "</div>" : "") + "</td></tr>";
+    }
+    html += "</tbody></table></div>";
+  }
+
+  area.innerHTML = html + "</div>";
+}
+
+/* ============================ рендер: таблица ============================ */
+
+function renderStandings(){
+  const area = $("#standArea");
+  const { rows, finishedRaces } = standings();
+  if(!finishedRaces.length || !rows.length){
+    area.innerHTML = '<div class="empty">Завершите хотя бы один заезд, чтобы здесь появилась турнирная таблица.</div>';
+    return;
+  }
+  let html = '<div class="tblwrap"><table class="tbl"><thead><tr>' +
+    "<th>#</th><th>Пилот</th><th class=\"num\">Очки</th><th class=\"num\">Победы</th>" +
+    '<th class="num">Заездов</th><th class="num">Лучший круг</th>';
+  for(const r of finishedRaces) html += '<th class="num" title="' + esc(r.name) + '">' + esc(r.name.length > 14 ? r.name.slice(0, 13) + "…" : r.name) + "</th>";
+  html += "</tr></thead><tbody>";
+  rows.forEach((row, i) => {
+    const medal = i < 3 ? " m" + (i + 1) : "";
+    html += "<tr>" +
+      '<td><span class="pos-badge' + medal + '">' + (i + 1) + "</span></td>" +
+      "<td><span class=\"pilot-cell\"><span class=\"chip\" style=\"background:" + esc(row.pilot.color) + '"></span><b>' +
+        esc(displayName(row.pilot)) + "</b></span></td>" +
+      '<td class="num"><b class="bigstat">' + row.total + "</b></td>" +
+      '<td class="num">' + row.wins + "</td>" +
+      '<td class="num">' + row.races + "</td>" +
+      '<td class="num mono">' + (row.bestLap != null ? fmtTime(row.bestLap) : "—") + "</td>";
+    for(const r of finishedRaces){
+      const v = row.perRace[r.id];
+      html += '<td class="num mono">' + (v === undefined ? '<span class="sub">—</span>' : v) + "</td>";
+    }
+    html += "</tr>";
+  });
+  area.innerHTML = html + "</tbody></table></div>";
+}
+
+/* ============================ настройки / данные ============================ */
+
+function fillSettingsInputs(){
+  const s = state.settings;
+  $("#setPoints").value = s.placePoints.join(", ");
+  $("#setFlb").value = s.fastestLapBonus;
+  $("#setLpp").value = s.lapPoints;
+}
+function saveSettings(){
+  const pts = $("#setPoints").value.split(",").map(x => parseFloat(x.trim())).filter(n => isFinite(n) && n >= 0);
+  if(!pts.length){ toast("Укажите хотя бы одно значение очков за место", true); return; }
+  state.settings.placePoints = pts;
+  state.settings.fastestLapBonus = Math.max(0, Math.round(+$("#setFlb").value || 0));
+  state.settings.lapPoints = Math.max(0, Math.round(+$("#setLpp").value || 0));
+  save(); renderRaces(); renderStandings(); renderPilots(); fillSettingsInputs();
+  toast("Настройки сохранены — очки пересчитаны");
+}
+function exportJson(){
+  const blob = new Blob([JSON.stringify(state, null, 2)], { type: "application/json" });
+  const a = document.createElement("a");
+  const d = new Date();
+  const stamp = d.getFullYear() + String(d.getMonth()+1).padStart(2,"0") + String(d.getDate()).padStart(2,"0") +
+    "-" + String(d.getHours()).padStart(2,"0") + String(d.getMinutes()).padStart(2,"0");
+  a.href = URL.createObjectURL(blob);
+  a.download = "mqdr-racer-" + stamp + ".json";
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  setTimeout(() => URL.revokeObjectURL(a.href), 3000);
+  toast("Файл экспорта скачан");
+}
+function importJson(file){
+  const reader = new FileReader();
+  reader.onload = () => {
+    try{
+      const o = JSON.parse(String(reader.result));
+      if(!o || !Array.isArray(o.pilots) || !Array.isArray(o.races) || !o.settings) throw new Error("bad format");
+      if(!confirm("Заменить текущие данные содержимым файла?")) return;
+      state = migrate(o);
+      if(!state.ui) state.ui = { tab: "pilots", viewRaceId: null };
+      save(); fillSettingsInputs(); renderAll();
+      toast("Данные импортированы");
+    }catch(e){
+      console.error(e);
+      toast("Ошибка импорта: файл не распознан", true);
+    }
+  };
+  reader.onerror = () => toast("Не удалось прочитать файл", true);
+  reader.readAsText(file);
+}
+function demoData(){
+  if(state.pilots.length && !confirm("Заменить текущие данные демо-набором?")) return;
+  const defs = [
+    ["Иван Петров","FALCON","R1 · 5658"],["Анна Смирнова","VIPER","R2 · 5695"],
+    ["Сергей Ким","HAWK","R3 · 5732"],["Дмитрий Волков","GHOST","R4 · 5769"],
+    ["Ольга Ли","NEON","F2 · 5806"],["Максим Орлов","STORM","F4 · 5880"]
+  ];
+  const pilots = defs.map((d, i) => ({ id: uid(), name: d[0], callsign: d[1], channel: d[2], color: PALETTE[i % PALETTE.length] }));
+  const mkRace = (name, ageDays) => {
+    const startedAt = Date.now() - ageDays * 864e5;
+    const entries = pilots.map(p => {
+      const base = 19500 + Math.random() * 6000;
+      const n = 3 + Math.floor(Math.random() * 3);
+      const laps = [];
+      for(let i = 0; i < n; i++) laps.push(Math.round(base + (Math.random() * 5000 - 2500)));
+      return { pilotId: p.id, laps, finishedAt: null, finishOrder: null };
+    });
+    entries.sort((a,b) => a.laps.reduce((x,y) => x+y, 0) - b.laps.reduce((x,y) => x+y, 0));
+    entries.forEach((e, i) => { e.finishOrder = i + 1; e.finishedAt = startedAt + e.laps.reduce((x,y) => x+y, 0); });
+    return { id: uid(), name, createdAt: startedAt - 36e5, status: "finished", startedAt, finishCounter: entries.length, entries };
+  };
+  state = DEFAULTS();
+  state.pilots = pilots;
+  state.races = [ mkRace("Этап 2 — гонка", 1), mkRace("Этап 1 — гонка", 8) ];
+  save(); fillSettingsInputs(); renderAll();
+  toast("Демо-данные загружены: 6 пилотов, 2 заезда");
+}
+function resetAll(){
+  if(!confirm("Удалить ВСЕ данные: пилотов, заезды, результаты?")) return;
+  state = DEFAULTS();
+  save(); fillSettingsInputs(); renderAll();
+  toast("Данные сброшены");
+}
+
+/* ============================ навигация / рендер ============================ */
+
+function switchTab(tab){
+  state.ui.tab = tab;
+  $$(".tab-btn").forEach(b => b.classList.toggle("active", b.dataset.tab === tab));
+  $$(".tab").forEach(s => s.classList.toggle("active", s.id === "tab-" + tab));
+}
+function renderTabs(){
+  $("#cntPilots").textContent = state.pilots.length;
+  $("#cntRaces").textContent = state.races.length;
+}
+function renderAll(){
+  renderTabs();
+  renderPilots();
+  renderRaces();
+  renderStandings();
+}
+
+/* ============================ события ============================ */
+
+$("#pilotForm").addEventListener("submit", (e) => {
+  e.preventDefault();
+  const name = $("#pilotName").value.trim();
+  if(!name) return;
+  state.pilots.push({
+    id: uid(), name,
+    callsign: $("#pilotCall").value.trim(),
+    channel: $("#pilotCh").value.trim(),
+    color: PALETTE[state.pilots.length % PALETTE.length]
+  });
+  save(); renderAll();
+  $("#pilotForm").reset();
+  $("#pilotName").focus();
+  toast("Пилот добавлен");
+});
+
+$("#raceForm").addEventListener("submit", (e) => {
+  e.preventDefault();
+  const name = $("#raceName").value.trim();
+  $("#raceName").value = "";
+  state.ui.tab = "races";
+  switchTab("races");
+  createRace(name);
+});
+
+document.addEventListener("click", (e) => {
+  const el = e.target.closest("[data-action]");
+  if(!el) return;
+  const act = el.dataset.action;
+  const id = el.dataset.id;
+  switch(act){
+    case "del-pilot": deletePilot(id); break;
+    case "open-race": state.ui.viewRaceId = id; switchTab("races"); save(); renderRaces(); break;
+    case "del-race": deleteRace(id); break;
+    case "back-to-races": state.ui.viewRaceId = null; save(); renderRaces(); break;
+    case "start-race": startRace(id); break;
+    case "lap": recordLap(el.dataset.race, id); break;
+    case "finish-pilot": finishPilot(el.dataset.race, id); break;
+    case "undo-lap": undoLap(el.dataset.race, id); break;
+    case "end-race": endRace(id); break;
+    case "save-settings": saveSettings(); break;
+    case "export-json": exportJson(); break;
+    case "import-json": $("#importFile").click(); break;
+    case "demo-data": demoData(); break;
+    case "reset-all": resetAll(); break;
+  }
+});
+
+document.addEventListener("change", (e) => {
+  const el = e.target;
+  if(el.matches("[data-action='toggle-pilot']")) toggleRacePilot(el.dataset.race, el.dataset.id, el.checked);
+  if(el.id === "importFile" && el.files && el.files[0]){
+    importJson(el.files[0]);
+    el.value = "";
+  }
+});
+
+$("#tabsNav").addEventListener("click", (e) => {
+  const b = e.target.closest(".tab-btn");
+  if(b) switchTab(b.dataset.tab);
+});
+
+document.addEventListener("keydown", (e) => {
+  if(!/^[1-9]$/.test(e.key)) return;
+  const t = e.target;
+  if(t && (t.tagName === "INPUT" || t.tagName === "TEXTAREA" || t.tagName === "SELECT")) return;
+  const race = getRace(state.ui.viewRaceId);
+  if(!race || race.status !== "running") return;
+  const entry = race.entries[+e.key - 1];
+  if(entry) recordLap(race.id, entry.pilotId);
+});
+
+/* тикер: часы заезда и «текущий круг» */
+setInterval(() => {
+  const race = activeRunningRace();
+  if(!race || !race.startedAt) return;
+  const now = Date.now();
+  const clock = $("#raceClock");
+  if(clock && state.ui.viewRaceId === race.id) clock.textContent = fmtClock(now - race.startedAt);
+  $$("[data-cur]").forEach(td => {
+    const e = race.entries.find(x => x.pilotId === td.dataset.cur);
+    if(!e || e.finishedAt) return;
+    td.textContent = fmtTime(now - (race.startedAt + cumBefore(e)));
+  });
+}, 100);
+
+/* ============================ старт ============================ */
+fillSettingsInputs();
+switchTab(state.ui.tab || "pilots");
+renderAll();
+</script>
+</body>
+</html>
